@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FastLink | IndustriasTech</title>
+    <!-- Meta tags para que se comporte como aplicación nativa en Android -->
+    <meta name="theme-color" content="#1d4ed8">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231d4ed8'/><circle cx='50' cy='50' r='20' fill='white'/></svg>">
+    
+    <style>
+        :root {
+            --primary: #1d4ed8; --primary-dark: #1e3a8a; --bg: #f1f5f9;
+            --surface: #ffffff; --text: #0f172a; --text-muted: #64748b;
+            --border: #e2e8f0; --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        /* Pantalla de Login */
+        #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 20px; background: var(--surface); z-index: 2000; position: absolute; width: 100%; top: 0; left: 0; }
+        .login-box { width: 100%; max-width: 350px; text-align: center; }
+        .login-box h1 { color: var(--primary); margin-bottom: 5px; }
+        .login-box input { width: 100%; padding: 15px; margin: 15px 0; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; outline: none; }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn-main:active { background: var(--primary-dark); }
+        .spinner { border: 3px solid rgba(255,255,255,0.3); border-top: 3px solid white; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Contenedor Principal (App) */
+        #app-screen { display: none; flex-direction: column; height: 100%; }
+
+        /* Header y Pestañas */
+        .app-header { background: var(--primary); color: white; padding: 15px 15px 0 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10; }
+        .app-title { font-size: 20px; font-weight: bold; margin-bottom: 15px; text-align: center; }
+        .tabs-container { display: flex; overflow-x: auto; scrollbar-width: none; padding-bottom: 10px; gap: 10px; }
+        .tabs-container::-webkit-scrollbar { display: none; }
+        
+        .tab { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 16px; border-radius: 20px; font-size: 14px; white-space: nowrap; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 5px; }
+        .tab.active { background: var(--surface); color: var(--primary); font-weight: bold; }
+        .tab-count { background: rgba(0,0,0,0.1); border-radius: 10px; padding: 2px 6px; font-size: 11px; margin-left: 5px; }
+        .tab.active .tab-count { background: var(--bg); color: var(--text-muted); }
+
+        /* Lista de Enlaces (Contenido) */
+        .content-area { flex: 1; overflow-y: auto; padding: 15px; padding-bottom: 80px; }
+        .empty-state { text-align: center; color: var(--text-muted); margin-top: 50px; }
+
+        .link-card { background: var(--surface); border-radius: 12px; padding: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); position: relative; }
+        .link-icon { width: 40px; height: 40px; border-radius: 8px; background: var(--bg); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+        .link-icon img { width: 100%; height: 100%; object-fit: cover; }
+        .link-info { flex: 1; overflow: hidden; cursor: pointer; }
+        .link-title { font-weight: bold; font-size: 15px; margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .link-url { color: var(--text-muted); font-size: 12px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .link-options { background: none; border: none; color: var(--text-muted); font-size: 20px; padding: 5px; cursor: pointer; }
+
+        /* Barra Inferior (Bottom Nav) */
+        .bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: var(--surface); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 100; padding-bottom: env(safe-area-inset-bottom, 10px); }
+        .nav-item { background: none; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; display: flex; flex-direction: column; align-items: center; flex: 1; }
+        .nav-item span { font-size: 10px; margin-top: 4px; }
+        .nav-item.active { color: var(--primary); }
+        .fab { background: var(--primary); color: white; width: 50px; height: 50px; border-radius: 25px; border: none; font-size: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(29, 78, 216, 0.3); transform: translateY(-15px); cursor: pointer; }
+        .fab:active { transform: translateY(-13px); }
+
+        /* Modales */
+        .modal-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: flex-end; justify-content: center; }
+        .modal-content { background: var(--surface); width: 100%; border-radius: 20px 20px 0 0; padding: 25px 20px; box-shadow: 0 -4px 15px rgba(0,0,0,0.1); animation: slideUp 0.3s ease-out; max-height: 90vh; overflow-y: auto; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; font-size: 18px; }
+        .close-btn { background: var(--bg); border: none; width: 30px; height: 30px; border-radius: 15px; font-weight: bold; cursor: pointer; color: var(--text-muted); }
+
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 5px; }
+        .input-group input, .input-group select { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; outline: none; background: var(--bg); }
+        .input-group input:focus, .input-group select:focus { border-color: var(--primary); }
+        
+        .flex-btns { display: flex; gap: 10px; }
+        .btn-secondary { background: var(--bg); color: var(--text); border: none; padding: 15px; width: 100%; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn-danger-outline { background: none; color: var(--danger); border: 1px solid var(--danger); padding: 12px; width: 100%; border-radius: 10px; font-size: 14px; cursor: pointer; margin-top: 10px;}
+
+        /* Lista Gestor Pestañas */
+        .tab-manager-list { margin-bottom: 20px; }
+        .tab-manager-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--border); }
+        .tab-manager-info { display: flex; align-items: center; gap: 10px; font-weight: bold; }
+        .tab-manager-actions { display: flex; gap: 5px; }
+        .action-btn { background: var(--bg); border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .action-btn.up { color: #10b981; }
+        .action-btn.down { color: #f59e0b; }
+    </style>
+</head>
+<body onload="initApp()">
+
+    <!-- Pantalla Login -->
+    <div id="login-screen">
+        <div class="login-box">
+            <svg width="60" height="60" viewBox="0 0 100 100" style="margin-bottom: 10px;"><rect width="100" height="100" rx="20" fill="#1d4ed8"/><circle cx="50" cy="50" r="20" fill="white"/></svg>
+            <h1>FastLink</h1>
+            <p style="color: var(--text-muted); margin-top:0;">Bóveda Segura</p>
+            <input type="password" id="pwd" placeholder="Contraseña Maestra">
+            <button class="btn-main" id="btn-login" onclick="autenticar()">Desbloquear</button>
+        </div>
+    </div>
+
+    <!-- Pantalla Principal -->
+    <div id="app-screen">
+        <div class="app-header">
+            <div class="app-title">Mis Enlaces</div>
+            <div class="tabs-container" id="pestanas-container">
+                <!-- Pestañas renderizadas por JS -->
+            </div>
+        </div>
+
+        <div class="content-area" id="enlaces-container">
+            <!-- Enlaces renderizados por JS -->
+        </div>
+
+        <div class="bottom-bar">
+            <button class="nav-item active" onclick="cerrarModales()">
+                🏠<span>Inicio</span>
+            </button>
+            <button class="fab" onclick="abrirModalEnlace()">
+                ➕
+            </button>
+            <button class="nav-item" onclick="abrirGestorPestanas()">
+                📑<span>Pestañas</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal: Formulario Enlace (Agregar/Editar) -->
+    <div id="modal-enlace" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-enlace-titulo">Añadir Enlace</h3>
+                <button class="close-btn" onclick="cerrarModales()">✕</button>
+            </div>
+            <div class="input-group">
+                <label>Enlace (URL)</label>
+                <input type="url" id="link-url" placeholder="https://..." onblur="intentarExtraerTitulo()">
+            </div>
+            <div class="input-group">
+                <label>Título</label>
+                <input type="text" id="link-titulo" placeholder="Ej. Video de Entrenamiento">
+            </div>
+            <div class="input-group">
+                <label>Guardar en Pestaña</label>
+                <select id="link-pestana"></select>
+            </div>
+            <div class="flex-btns">
+                <button class="btn-secondary" onclick="cerrarModales()">Cancelar</button>
+                <button class="btn-main" id="btn-guardar-enlace" onclick="guardarEnlace()">Guardar</button>
+            </div>
+            <button id="btn-eliminar-enlace" class="btn-danger-outline" style="display:none;" onclick="eliminarEnlace()">🗑️ Eliminar este enlace</button>
+        </div>
+    </div>
+
+    <!-- Modal: Gestor de Pestañas -->
+    <div id="modal-gestor" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Gestionar Pestañas</h3>
+                <button class="close-btn" onclick="cerrarModales()">✕</button>
+            </div>
+            <button class="btn-main" style="margin-bottom: 15px;" onclick="abrirModalPestana()">+ Crear Nueva Pestaña</button>
+            <div class="tab-manager-list" id="lista-gestor-pestanas">
+                <!-- Lista para ordenar y editar -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Formulario Pestaña (Agregar/Editar) -->
+    <div id="modal-pestana" class="modal-overlay" style="z-index: 1100;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-pestana-titulo">Nueva Pestaña</h3>
+                <button class="close-btn" onclick="document.getElementById('modal-pestana').style.display='none'">✕</button>
+            </div>
+            <div class="input-group">
+                <label>Nombre de la Pestaña</label>
+                <input type="text" id="tab-nombre" placeholder="Ej. Películas">
+            </div>
+            <div class="input-group">
+                <label>Emoji Icono</label>
+                <input type="text" id="tab-emoji" placeholder="Ej. 🎥">
+            </div>
+            <div class="flex-btns">
+                <button class="btn-secondary" onclick="document.getElementById('modal-pestana').style.display='none'">Cancelar</button>
+                <button class="btn-main" id="btn-guardar-pestana" onclick="guardarPestana()">Guardar</button>
+            </div>
+            <button id="btn-eliminar-pestana" class="btn-danger-outline" style="display:none;" onclick="eliminarPestana()">🗑️ Eliminar Pestaña</button>
+        </div>
+    </div>
+
+    <script>
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbzAn83XXBvhs7Aca2Cw20JelgIZuqsL5KoNFN30sN4AXugAikn7NE5TYh_PAk8BYO3pOQ/exec";
+        
+        let bd_pestanas = [];
+        let bd_enlaces = [];
+        let pwdActual = "";
+        let pestanaActivaID = null;
+        
+        // Variables para edición
+        let enlaceEnEdicion = null;
+        let pestanaEnEdicion = null;
+
+        function initApp() {
+            const guardada = localStorage.getItem("fastlink_pwd");
+            if(guardada) {
+                document.getElementById('pwd').value = guardada;
+                autenticar();
+            }
+        }
+
+        async function autenticar() {
+            const pwd = document.getElementById('pwd').value;
+            const btn = document.getElementById('btn-login');
+            if(!pwd) return;
+
+            btn.innerHTML = `<div class="spinner"></div>`;
+            
+            try {
+                const res = await fetch(GAS_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({ 'password': pwd, 'accion': 'obtener_todo' })
+                });
+                const datos = await res.json();
+
+                if(datos.status === "success") {
+                    pwdActual = pwd;
+                    localStorage.setItem("fastlink_pwd", pwd);
+                    bd_pestanas = datos.pestanas;
+                    bd_enlaces = datos.enlaces;
+                    
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('app-screen').style.display = 'flex';
+                    
+                    // Si no hay pestaña activa, seleccionar la primera por defecto
+                    if(bd_pestanas.length > 0 && !pestanaActivaID) {
+                        pestanaActivaID = bd_pestanas[0].id;
+                    }
+                    
+                    renderizarUI();
+                } else {
+                    alert("Contraseña incorrecta.");
+                    localStorage.removeItem("fastlink_pwd");
+                    btn.innerHTML = "Desbloquear";
+                }
+            } catch (e) {
+                alert("Error de red.");
+                btn.innerHTML = "Desbloquear";
+            }
+        }
+
+        async function recargarDatosSilencioso() {
+            const res = await fetch(GAS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ 'password': pwdActual, 'accion': 'obtener_todo' })
+            });
+            const datos = await res.json();
+            if(datos.status === "success") {
+                bd_pestanas = datos.pestanas;
+                bd_enlaces = datos.enlaces;
+                renderizarUI();
+                if(document.getElementById('modal-gestor').style.display === 'flex') {
+                    renderizarGestorPestanas();
+                }
+            }
+        }
+
+        /* --- RENDERIZADO VISUAL --- */
+        function renderizarUI() {
+            renderizarPestanas();
+            renderizarEnlaces();
+        }
+
+        function renderizarPestanas() {
+            const container = document.getElementById('pestanas-container');
+            container.innerHTML = "";
+            
+            if(bd_pestanas.length === 0) {
+                container.innerHTML = `<span style="color:white; font-size:14px;">No hay pestañas.</span>`;
+                return;
+            }
+
+            bd_pestanas.forEach(p => {
+                // Contar enlaces de esta pestaña
+                const count = bd_enlaces.filter(e => e.id_pestana == p.id).length;
+                const esActiva = (p.id == pestanaActivaID) ? 'active' : '';
+                
+                const btn = document.createElement('button');
+                btn.className = `tab ${esActiva}`;
+                btn.onclick = () => cambiarPestana(p.id);
+                btn.innerHTML = `${p.emoji} ${p.nombre} <span class="tab-count">${count}</span>`;
+                container.appendChild(btn);
+            });
+        }
+
+        function cambiarPestana(id) {
+            pestanaActivaID = id;
+            renderizarUI();
+        }
+
+        function extraerFavicon(url) {
+            try {
+                let formatted = url.startsWith('http') ? url : 'https://' + url;
+                let domain = new URL(formatted).hostname;
+                return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+            } catch(e) {
+                return null;
+            }
+        }
+
+        function renderizarEnlaces() {
+            const container = document.getElementById('enlaces-container');
+            container.innerHTML = "";
+
+            if(bd_pestanas.length === 0) {
+                container.innerHTML = `<div class="empty-state"><h3>Bienvenido</h3><p>Crea tu primera pestaña para empezar a guardar enlaces.</p></div>`;
+                return;
+            }
+
+            const enlacesFiltrados = bd_enlaces.filter(e => e.id_pestana == pestanaActivaID);
+            
+            if(enlacesFiltrados.length === 0) {
+                container.innerHTML = `<div class="empty-state"><p>No hay enlaces en esta pestaña.</p></div>`;
+                return;
+            }
+
+            // Mostrar los enlaces del último al primero
+            enlacesFiltrados.reverse().forEach(e => {
+                let linkFinal = e.enlace.startsWith('http') ? e.enlace : 'https://' + e.enlace;
+                let iconoUrl = extraerFavicon(linkFinal);
+                
+                const card = document.createElement('div');
+                card.className = "link-card";
+                card.innerHTML = `
+                    <div class="link-icon">
+                        ${iconoUrl ? `<img src="${iconoUrl}" alt="icon">` : '🌍'}
+                    </div>
+                    <div class="link-info" onclick="window.open('${linkFinal}', '_blank')">
+                        <h4 class="link-title">${e.titulo}</h4>
+                        <p class="link-url">${linkFinal}</p>
+                    </div>
+                    <button class="link-options" onclick="abrirModalEnlace('${e.id}')">⋮</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        /* --- MODALES Y FORMULARIOS --- */
+        function cerrarModales() {
+            document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none');
+        }
+
+        function abrirModalEnlace(idEnlace = null) {
+            if(bd_pestanas.length === 0) return alert("Primero debes crear una pestaña.");
+            
+            const select = document.getElementById('link-pestana');
+            select.innerHTML = "";
+            bd_pestanas.forEach(p => {
+                select.innerHTML += `<option value="${p.id}">${p.emoji} ${p.nombre}</option>`;
+            });
+
+            enlaceEnEdicion = idEnlace;
+            
+            if(idEnlace) {
+                document.getElementById('modal-enlace-titulo').innerText = "Editar Enlace";
+                document.getElementById('btn-eliminar-enlace').style.display = "block";
+                
+                const en = bd_enlaces.find(e => e.id == idEnlace);
+                document.getElementById('link-url').value = en.enlace;
+                document.getElementById('link-titulo').value = en.titulo;
+                select.value = en.id_pestana;
+            } else {
+                document.getElementById('modal-enlace-titulo').innerText = "Añadir Enlace";
+                document.getElementById('btn-eliminar-enlace').style.display = "none";
+                
+                document.getElementById('link-url').value = "";
+                document.getElementById('link-titulo').value = "";
+                select.value = pestanaActivaID; // Seleccionar pestaña actual por defecto
+            }
+            
+            document.getElementById('modal-enlace').style.display = "flex";
+        }
+
+        function intentarExtraerTitulo() {
+            const url = document.getElementById('link-url').value;
+            const titulo = document.getElementById('link-titulo');
+            if(url && titulo.value === "") {
+                try {
+                    let domain = new URL(url.startsWith('http') ? url : 'https://'+url).hostname;
+                    let nombreCorto = domain.replace('www.', '').split('.')[0];
+                    // Capitalizar primera letra
+                    titulo.value = nombreCorto.charAt(0).toUpperCase() + nombreCorto.slice(1);
+                } catch(e) {}
+            }
+        }
+
+        /* --- CRUD ENLACES --- */
+        async function guardarEnlace() {
+            const url = document.getElementById('link-url').value;
+            const titulo = document.getElementById('link-titulo').value || "Enlace";
+            const idPestana = document.getElementById('link-pestana').value;
+            const btn = document.getElementById('btn-guardar-enlace');
+            
+            if(!url) return alert("Escribe un enlace.");
+
+            btn.innerHTML = `<div class="spinner"></div>`;
+            btn.disabled = true;
+
+            const payload = {
+                password: pwdActual,
+                accion: enlaceEnEdicion ? 'editar_enlace' : 'agregar_enlace',
+                titulo: titulo,
+                enlace: url,
+                id_pestana: idPestana
+            };
+
+            if(enlaceEnEdicion) {
+                const obj = bd_enlaces.find(e => e.id == enlaceEnEdicion);
+                payload.fila = obj.fila;
+            }
+
+            await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(payload) });
+            
+            pestanaActivaID = idPestana; // Mover al usuario a la pestaña donde guardó el enlace
+            cerrarModales();
+            btn.innerHTML = "Guardar";
+            btn.disabled = false;
+            recargarDatosSilencioso();
+        }
+
+        async function eliminarEnlace() {
+            if(!confirm("¿Borrar este enlace?")) return;
+            const obj = bd_enlaces.find(e => e.id == enlaceEnEdicion);
+            
+            cerrarModales();
+            await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ password: pwdActual, accion: 'eliminar_enlace', fila: obj.fila }) });
+            recargarDatosSilencioso();
+        }
+
+        /* --- GESTOR DE PESTAÑAS (ORDENAR/EDITAR) --- */
+        function abrirGestorPestanas() {
+            renderizarGestorPestanas();
+            document.getElementById('modal-gestor').style.display = "flex";
+        }
+
+        function renderizarGestorPestanas() {
+            const list = document.getElementById('lista-gestor-pestanas');
+            list.innerHTML = "";
+            
+            bd_pestanas.forEach((p, index) => {
+                list.innerHTML += `
+                    <div class="tab-manager-item">
+                        <div class="tab-manager-info">${p.emoji} ${p.nombre}</div>
+                        <div class="tab-manager-actions">
+                            <button class="action-btn up" onclick="ejecutarMover(${index}, 'up')">⬆️</button>
+                            <button class="action-btn down" onclick="ejecutarMover(${index}, 'down')">⬇️</button>
+                            <button class="action-btn" onclick="abrirModalPestana('${p.id}')">✏️</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        async function ejecutarMover(index, direccion) {
+            if (direccion === 'up' && index === 0) return; // Ya está arriba
+            if (direccion === 'down' && index === bd_pestanas.length - 1) return; // Ya está abajo
+
+            const actual = bd_pestanas[index];
+            const destino = direccion === 'up' ? bd_pestanas[index - 1] : bd_pestanas[index + 1];
+
+            // Feedback visual rápido
+            document.getElementById('lista-gestor-pestanas').style.opacity = '0.5';
+
+            await fetch(GAS_URL, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, 
+                body: new URLSearchParams({ 
+                    password: pwdActual, 
+                    accion: 'mover_pestana', 
+                    fila: actual.fila, 
+                    fila_destino: destino.fila,
+                    orden_actual: actual.orden,
+                    orden_destino: destino.orden
+                }) 
+            });
+            
+            await recargarDatosSilencioso();
+            document.getElementById('lista-gestor-pestanas').style.opacity = '1';
+        }
+
+        function abrirModalPestana(idPestana = null) {
+            pestanaEnEdicion = idPestana;
+            
+            if(idPestana) {
+                document.getElementById('modal-pestana-titulo').innerText = "Editar Pestaña";
+                document.getElementById('btn-eliminar-pestana').style.display = "block";
+                const p = bd_pestanas.find(x => x.id == idPestana);
+                document.getElementById('tab-nombre').value = p.nombre;
+                document.getElementById('tab-emoji').value = p.emoji;
+            } else {
+                document.getElementById('modal-pestana-titulo').innerText = "Nueva Pestaña";
+                document.getElementById('btn-eliminar-pestana').style.display = "none";
+                document.getElementById('tab-nombre').value = "";
+                document.getElementById('tab-emoji').value = "📁";
+            }
+            
+            document.getElementById('modal-pestana').style.display = "flex";
+        }
+
+        async function guardarPestana() {
+            const nombre = document.getElementById('tab-nombre').value;
+            const emoji = document.getElementById('tab-emoji').value || "📁";
+            const btn = document.getElementById('btn-guardar-pestana');
+
+            if(!nombre) return alert("Ponle un nombre a la pestaña.");
+
+            btn.innerHTML = `<div class="spinner"></div>`;
+            btn.disabled = true;
+
+            const payload = {
+                password: pwdActual,
+                accion: pestanaEnEdicion ? 'editar_pestana' : 'agregar_pestana',
+                nombre: nombre,
+                emoji: emoji
+            };
+
+            if(pestanaEnEdicion) {
+                const p = bd_pestanas.find(x => x.id == pestanaEnEdicion);
+                payload.fila = p.fila;
+            }
+
+            await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(payload) });
+            
+            document.getElementById('modal-pestana').style.display = "none";
+            btn.innerHTML = "Guardar";
+            btn.disabled = false;
+            recargarDatosSilencioso();
+        }
+
+        async function eliminarPestana() {
+            if(!confirm("¿Estás seguro? Se borrarán todos los enlaces de esta pestaña.")) return;
+            const p = bd_pestanas.find(x => x.id == pestanaEnEdicion);
+            
+            document.getElementById('modal-pestana').style.display = "none";
+            await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ password: pwdActual, accion: 'eliminar_pestana', fila: p.fila }) });
+            
+            if(pestanaActivaID == p.id) pestanaActivaID = null; // Resetear vista
+            recargarDatosSilencioso();
+        }
+    </script>
+</body>
+</html>
